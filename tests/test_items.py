@@ -33,11 +33,14 @@ def test_item_crud_multi_cabinet_and_storage_images():
     # 1. Create item belonging to multiple cabinets (Cabinet A & Cabinet C)
     res = client.post("/api/items", json={
         "name": "Screwdriver Set",
-        "cabinet_ids": [c1["id"], c3["id"]]
+        "cabinet_ids": [c1["id"], c3["id"]],
+        "quantity": 5
     })
     assert res.status_code == 201
     item = res.json()
     assert item["name"] == "Screwdriver Set"
+    assert item["quantity"] == 5
+    assert "created_at" in item
     assert set(item["cabinet_ids"]) == {c1["id"], c3["id"]}
     item_id = item["id"]
 
@@ -64,6 +67,7 @@ def test_item_crud_multi_cabinet_and_storage_images():
     res = client.get(f"/api/items/{item_id}")
     assert res.status_code == 200
     detail = res.json()
+    assert detail["quantity"] == 5
     assert len(detail["cabinets"]) == 2
     assert len(detail["rooms"]) == 2
     assert len(detail["storage_images"]) == 2
@@ -88,13 +92,15 @@ def test_item_crud_multi_cabinet_and_storage_images():
     assert len(c3_detail["items"]) == 1
     assert c3_detail["items"][0]["name"] == "Screwdriver Set"
 
-    # 7. Move item to Cabinet B only
+    # 7. Move item to Cabinet B only and update quantity
     res = client.put(f"/api/items/{item_id}", json={
-        "cabinet_ids": [c2["id"]]
+        "cabinet_ids": [c2["id"]],
+        "quantity": 3
     })
     assert res.status_code == 200
     updated_item = res.json()
     assert updated_item["cabinet_ids"] == [c2["id"]]
+    assert updated_item["quantity"] == 3
 
     # 8. Delete item
     res = client.delete(f"/api/items/{item_id}")

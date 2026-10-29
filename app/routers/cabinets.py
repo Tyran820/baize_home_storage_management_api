@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form, Query, status
 from pydantic import BaseModel
 from bson import ObjectId
@@ -31,7 +32,8 @@ def create_cabinet(
     cabinet_doc = {
         "name": name,
         "room_id": actual_room_id,
-        "image_url": image_url
+        "image_url": image_url,
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = db.cabinets.insert_one(cabinet_doc)
     cabinet_doc["_id"] = str(result.inserted_id) if result.inserted_id else cabinet_doc.get("_id")

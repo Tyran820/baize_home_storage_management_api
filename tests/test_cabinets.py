@@ -32,6 +32,7 @@ def test_cabinet_crud_and_moving():
     cab = res.json()
     assert cab["name"] == "TV Stand"
     assert cab["room_id"] == r1["id"]
+    assert "created_at" in cab
     cab_id = cab["id"]
 
     # 2. List cabinets

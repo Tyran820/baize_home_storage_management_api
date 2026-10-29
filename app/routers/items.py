@@ -1,4 +1,5 @@
 from typing import Optional, List, Dict
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form, status, Body
 from pydantic import BaseModel, Field
 from bson import ObjectId
@@ -11,10 +12,12 @@ router = APIRouter(prefix="/api/items", tags=["Items"])
 class ItemCreateSchema(BaseModel):
     name: str
     cabinet_ids: List[str] = Field(..., min_length=1, description="List of cabinet IDs where item is stored")
+    quantity: int = Field(default=1, ge=1, description="Quantity of the item")
 
 class ItemUpdateSchema(BaseModel):
     name: Optional[str] = None
     cabinet_ids: Optional[List[str]] = None
+    quantity: Optional[int] = Field(default=None, ge=1, description="Quantity of the item")
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_item(item_data: ItemCreateSchema):
@@ -32,8 +35,10 @@ def create_item(item_data: ItemCreateSchema):
 
     item_doc = {
         "name": item_data.name,
+        "quantity": item_data.quantity,
         "cabinet_ids": list(set(valid_cabinet_ids)),
-        "cabinet_images": {}  # mapping cabinet_id -> image_url
+        "cabinet_images": {},  # mapping cabinet_id -> image_url
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = db.items.insert_one(item_doc)
     item_doc["_id"] = str(result.inserted_id) if result.inserted_id else item_doc.get("_id")
@@ -97,6 +102,9 @@ def update_item(item_id: str, item_data: ItemUpdateSchema):
     update_fields = {}
     if item_data.name is not None:
         update_fields["name"] = item_data.name
+
+    if item_data.quantity is not None:
+        update_fields["quantity"] = item_data.quantity
 
     if item_data.cabinet_ids is not None:
         if len(item_data.cabinet_ids) == 0:

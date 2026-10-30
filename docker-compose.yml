@@ -1,0 +1,69 @@
+version: "3.8"
+
+services:
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik-gateway
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"        # API Gateway HTTP entrypoint
+      - "8080:8080"    # Traefik Dashboard
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - storage-network
+
+  mongo:
+    image: mongo:7.0
+    container_name: storage-mongo
+    restart: always
+    environment:
+      - MONGO_INITDB_DATABASE=home_storage_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - storage-network
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --eval 'db.runCommand(\"ping\").ok' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  storage-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: home-storage-microservice
+    restart: always
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017
+      - MONGODB_DB_NAME=home_storage_db
+      - USE_MONGOMOCK=false
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - storage-network
+    labels:
+      - "traefik.enable=true"
+      # Route requests starting with /api, /uploads, /docs, /openapi.json, /redoc, or /health to this microservice
+      - "traefik.http.routers.storage-service.rule=PathPrefix(`/api`) || PathPrefix(`/uploads`) || PathPrefix(`/docs`) || PathPrefix(`/openapi.json`) || PathPrefix(`/redoc`) || PathPrefix(`/health`)"
+      - "traefik.http.routers.storage-service.entrypoints=web"
+      - "traefik.http.services.storage-service.loadbalancer.server.port=8000"
+
+networks:
+  storage-network:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  uploads_data:
